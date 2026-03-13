@@ -2,16 +2,23 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
-    tags-ignore: ['v*']      # ignore tags – they go to the release workflow
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -19,7 +26,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache Cargo registry & build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -29,22 +36,23 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install Homebrew (for brew test)
-        run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+      - name: Lint (rustfmt)
+        run: cargo fmt --all -- --check
+
+      - name: Lint (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build and test Rust
+        run: cargo test --verbose
 
       - name: Lint formula (Homebrew style)
         run: brew style Formula/toks.rb
 
-      - name: Audit formula (Homebrew audit)
+      - name: Build and install formula
+        run: brew install --build-from-source ./Formula/toks.rb
+
+      - name: Test formula
+        run: brew test toks
+
+      - name: Audit formula
         run: brew audit --strict --online Formula/toks.rb
-
-      - name: Build and test Rust
-        run: |
-          cargo test --verbose
-
-      - name: Test formula with Homebrew
-        run: |
-          brew install --build-from-source ./Formula/toks.rb
-          brew test toks
