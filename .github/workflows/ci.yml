@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    tags-ignore: ['v*']      # ignore tags – they go to the release workflow
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Homebrew (for brew test)
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+      - name: Lint formula (Homebrew style)
+        run: brew style Formula/toks.rb
+
+      - name: Audit formula (Homebrew audit)
+        run: brew audit --strict --online Formula/toks.rb
+
+      - name: Build and test Rust
+        run: |
+          cargo test --verbose
+
+      - name: Test formula with Homebrew
+        run: |
+          brew install --build-from-source ./Formula/toks.rb
+          brew test toks
