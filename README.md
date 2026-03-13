@@ -35,18 +35,29 @@ By stripping boilerplate, deduplicating lines, truncating noisy output and provi
 ### From source (requires Rust)
 
 ```sh
-git clone https://github.com/arkaung/toks.git
+git clone https://github.com/<your-username>/toks.git
 cd toks
 cargo install --path .
 ```
 
 This installs the `toks` binary into `~/.cargo/bin` (or `%USERPROFILE%\.cargo\bin` on Windows).
 
-### Pre‑built binaries
+### Pre‑built binaries (bottles)
 
-Check the [Releases](../../releases) page for downloadable binaries for Linux, macOS, and Windows.
+Check the [Releases](../../releases) page for downloadable bottles for macOS (Intel & Apple Silicon) and Linux.
 
----
+### Homebrew (via tap)
+
+If you prefer Homebrew, you can add our tap:
+
+```sh
+brew tap ark_aung/toks
+brew install toks
+```
+
+```sh
+brew install ./Formula/toks.rb
+```
 
 ## Quick start
 
