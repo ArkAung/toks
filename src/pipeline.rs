@@ -21,8 +21,10 @@ pub struct Ctx {
 ///
 /// There is no enum to extend, no match arm to add in a central dispatcher.
 pub trait Transformer {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>;
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a>;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,9 +35,10 @@ pub trait Transformer {
 pub struct StripAnsi;
 
 impl Transformer for StripAnsi {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
         Box::new(lines.map(|l| strip_ansi_str(&l)))
     }
 }
@@ -46,9 +49,10 @@ pub struct FilterNoise {
 }
 
 impl Transformer for FilterNoise {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
         let patterns = self.patterns.clone();
         Box::new(lines.filter(move |l| {
             let trimmed = l.trim();
@@ -63,9 +67,10 @@ pub struct KeepOnly {
 }
 
 impl Transformer for KeepOnly {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
         let patterns = self.patterns.clone();
         Box::new(lines.filter(move |l| {
             let lower = l.to_lowercase();
@@ -78,10 +83,15 @@ impl Transformer for KeepOnly {
 pub struct Dedup;
 
 impl Transformer for Dedup {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
-        Box::new(DedupIter { inner: lines, last: None, count: 0 })
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        Box::new(DedupIter {
+            inner: lines,
+            last: None,
+            count: 0,
+        })
     }
 }
 
@@ -113,11 +123,7 @@ impl<'a> Iterator for DedupIter<'a> {
                         let n = self.count;
                         self.count = 1;
                         if let Some(p) = prev {
-                            return Some(if n > 1 {
-                                format!("{p} (×{n})")
-                            } else {
-                                p
-                            });
+                            return Some(if n > 1 { format!("{p} (×{n})") } else { p });
                         }
                     }
                 }
@@ -133,13 +139,16 @@ pub struct Truncate {
 }
 
 impl Default for Truncate {
-    fn default() -> Self { Self { max: 200, tail: 10 } }
+    fn default() -> Self {
+        Self { max: 200, tail: 10 }
+    }
 }
 
 impl Transformer for Truncate {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
         let max = self.max;
         let tail = self.tail;
         let all: Vec<String> = lines.collect();
@@ -159,10 +168,14 @@ impl Transformer for Truncate {
 pub struct CollapseBlank;
 
 impl Transformer for CollapseBlank {
-    fn transform<'a>(&self, lines: Box<dyn Iterator<Item = String> + 'a>)
-        -> Box<dyn Iterator<Item = String> + 'a>
-    {
-        Box::new(CollapseBlankIter { inner: lines, last_blank: true })
+    fn transform<'a>(
+        &self,
+        lines: Box<dyn Iterator<Item = String> + 'a>,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        Box::new(CollapseBlankIter {
+            inner: lines,
+            last_blank: true,
+        })
     }
 }
 
@@ -177,7 +190,9 @@ impl<'a> Iterator for CollapseBlankIter<'a> {
         loop {
             let line = self.inner.next()?;
             if line.trim().is_empty() {
-                if self.last_blank { continue; }
+                if self.last_blank {
+                    continue;
+                }
                 self.last_blank = true;
             } else {
                 self.last_blank = false;
@@ -196,7 +211,9 @@ impl<'a> Iterator for CollapseBlankIter<'a> {
 pub struct Pipeline(Vec<Box<dyn Transformer>>);
 
 impl Pipeline {
-    pub fn new() -> Self { Self(Vec::new()) }
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
 
     pub fn push(mut self, t: impl Transformer + 'static) -> Self {
         self.0.push(Box::new(t));
@@ -207,7 +224,8 @@ impl Pipeline {
     pub fn run(&self, raw: &str) -> (String, usize, usize) {
         let raw_lines: Vec<String> = raw.lines().map(String::from).collect();
         let raw_count = raw_lines.len();
-        let mut iter: Box<dyn Iterator<Item = String>> = Box::new(raw_count_vec(raw_lines).into_iter());
+        let mut iter: Box<dyn Iterator<Item = String>> =
+            Box::new(raw_count_vec(raw_lines).into_iter());
         for t in &self.0 {
             iter = t.transform(iter);
         }
@@ -217,7 +235,9 @@ impl Pipeline {
     }
 }
 
-fn raw_count_vec(v: Vec<String>) -> Vec<String> { v }
+fn raw_count_vec(v: Vec<String>) -> Vec<String> {
+    v
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -232,22 +252,32 @@ pub fn strip_ansi_str(s: &str) -> String {
     while i < bytes.len() {
         if bytes[i] == 0x1b {
             i += 1;
-            if i >= bytes.len() { break; }
+            if i >= bytes.len() {
+                break;
+            }
             match bytes[i] {
                 b'[' => {
                     i += 1;
-                    while i < bytes.len() && !bytes[i].is_ascii_alphabetic() { i += 1; }
+                    while i < bytes.len() && !bytes[i].is_ascii_alphabetic() {
+                        i += 1;
+                    }
                     i += 1;
                 }
                 b']' => {
                     i += 1;
-                    while i < bytes.len() && bytes[i] != 0x07 { i += 1; }
+                    while i < bytes.len() && bytes[i] != 0x07 {
+                        i += 1;
+                    }
                     i += 1;
                 }
-                _ => { i += 1; }
+                _ => {
+                    i += 1;
+                }
             }
         } else {
-            if bytes[i] != b'\r' { out.push(bytes[i]); }
+            if bytes[i] != b'\r' {
+                out.push(bytes[i]);
+            }
             i += 1;
         }
     }
@@ -257,14 +287,16 @@ pub fn strip_ansi_str(s: &str) -> String {
 /// Execute a shell command, capture stdout+stderr, return combined output.
 pub fn capture(args: &[String]) -> anyhow::Result<String> {
     use std::process::Command;
-    if args.is_empty() { anyhow::bail!("no command given"); }
-    let output = Command::new(&args[0])
-        .args(&args[1..])
-        .output()?;
+    if args.is_empty() {
+        anyhow::bail!("no command given");
+    }
+    let output = Command::new(&args[0]).args(&args[1..]).output()?;
     let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr);
     if !stderr.is_empty() {
-        if !combined.is_empty() { combined.push('\n'); }
+        if !combined.is_empty() {
+            combined.push('\n');
+        }
         combined.push_str(&stderr);
     }
     Ok(combined)

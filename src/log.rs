@@ -5,7 +5,6 @@
 ///
 /// No SQLite. No serde_json. We hand-write the tiny JSONL we need.
 /// Reading is a simple line scan.
-
 use anyhow::Result;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -71,12 +70,18 @@ fn parse_line(line: &str) -> Option<Record> {
     let cmd = extract_str(line, "\"cmd\":\"")?;
     let raw = extract_u64(line, "\"raw\":")?;
     let filtered = extract_u64(line, "\"filtered\":")?;
-    Some(Record { ts, cmd, raw: raw as usize, filtered: filtered as usize })
+    Some(Record {
+        ts,
+        cmd,
+        raw: raw as usize,
+        filtered: filtered as usize,
+    })
 }
 
 fn extract_u64(s: &str, key: &str) -> Option<u64> {
     let start = s.find(key)? + key.len();
-    let end = s[start..].find(|c: char| !c.is_ascii_digit())
+    let end = s[start..]
+        .find(|c: char| !c.is_ascii_digit())
         .map(|i| start + i)
         .unwrap_or(s.len());
     s[start..end].parse().ok()
@@ -91,7 +96,10 @@ fn extract_str<'a>(s: &'a str, key: &str) -> Option<String> {
 pub fn gain(history: bool, as_json: bool) -> Result<()> {
     let path = log_path();
     if !path.exists() {
-        println!("No toks log found at {}. Run some commands first.", path.display());
+        println!(
+            "No toks log found at {}. Run some commands first.",
+            path.display()
+        );
         return Ok(());
     }
 
@@ -114,7 +122,11 @@ pub fn gain(history: bool, as_json: bool) -> Result<()> {
     let total_raw: usize = records.iter().map(|r| r.raw).sum();
     let total_filtered: usize = records.iter().map(|r| r.filtered).sum();
     let total_saved = total_raw.saturating_sub(total_filtered);
-    let pct = if total_raw > 0 { total_saved * 100 / total_raw } else { 0 };
+    let pct = if total_raw > 0 {
+        total_saved * 100 / total_raw
+    } else {
+        0
+    };
 
     if as_json {
         println!(
@@ -134,14 +146,24 @@ pub fn gain(history: bool, as_json: bool) -> Result<()> {
 
     if history {
         println!("\nRecent commands (last 20):");
-        println!("{:<20} {:>8} {:>8} {:>6}", "command", "raw", "filtered", "saved%");
+        println!(
+            "{:<20} {:>8} {:>8} {:>6}",
+            "command", "raw", "filtered", "saved%"
+        );
         println!("{}", "─".repeat(50));
         let start = records.len().saturating_sub(20);
         for r in &records[start..] {
             let saved = r.raw.saturating_sub(r.filtered);
             let pct = if r.raw > 0 { saved * 100 / r.raw } else { 0 };
-            let cmd_short = if r.cmd.len() > 18 { &r.cmd[..18] } else { &r.cmd };
-            println!("{:<20} {:>8} {:>8} {:>5}%", cmd_short, r.raw, r.filtered, pct);
+            let cmd_short = if r.cmd.len() > 18 {
+                &r.cmd[..18]
+            } else {
+                &r.cmd
+            };
+            println!(
+                "{:<20} {:>8} {:>8} {:>5}%",
+                cmd_short, r.raw, r.filtered, pct
+            );
         }
     }
 

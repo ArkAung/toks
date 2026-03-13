@@ -1,5 +1,7 @@
 use crate::log;
-use crate::pipeline::{capture, token_estimate, Dedup, CollapseBlank, Pipeline, StripAnsi, Truncate, Ctx};
+use crate::pipeline::{
+    capture, token_estimate, CollapseBlank, Ctx, Dedup, Pipeline, StripAnsi, Truncate,
+};
 use anyhow::Result;
 
 pub fn json_schema(file: &Option<String>, _ctx: &Ctx) -> Result<()> {
@@ -40,9 +42,17 @@ fn simplify_json(s: &str) -> String {
                     // drain until closing quote
                     let mut escaped = false;
                     for c2 in chars.by_ref() {
-                        if escaped { escaped = false; continue; }
-                        if c2 == '\\' { escaped = true; continue; }
-                        if c2 == '"' { break; }
+                        if escaped {
+                            escaped = false;
+                            continue;
+                        }
+                        if c2 == '\\' {
+                            escaped = true;
+                            continue;
+                        }
+                        if c2 == '"' {
+                            break;
+                        }
                     }
                     out.push_str("\"…\"");
                     in_string = false;
@@ -67,13 +77,19 @@ fn simplify_json(s: &str) -> String {
                 // Numeric or boolean value — skip and emit placeholder
                 let mut token = String::from(c);
                 while let Some(&nc) = chars.peek() {
-                    if nc == ',' || nc == '\n' || nc == '}' || nc == ']' { break; }
+                    if nc == ',' || nc == '\n' || nc == '}' || nc == ']' {
+                        break;
+                    }
                     token.push(chars.next().unwrap());
                 }
                 let t = token.trim();
-                if t == "true" || t == "false" { out.push_str(t); }
-                else if t == "null" { out.push_str("null"); }
-                else { out.push('0'); }
+                if t == "true" || t == "false" {
+                    out.push_str(t);
+                } else if t == "null" {
+                    out.push_str("null");
+                } else {
+                    out.push('0');
+                }
                 after_colon = false;
             }
             _ => {
@@ -85,7 +101,11 @@ fn simplify_json(s: &str) -> String {
 }
 
 pub fn log_dedup(args: &[String], _ctx: &Ctx) -> Result<()> {
-    let args: Vec<&str> = args.iter().skip_while(|a| a.as_str() == "--").map(String::as_str).collect();
+    let args: Vec<&str> = args
+        .iter()
+        .skip_while(|a| a.as_str() == "--")
+        .map(String::as_str)
+        .collect();
 
     let raw = if args.is_empty() {
         use std::io::Read;

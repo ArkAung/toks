@@ -1,6 +1,8 @@
 use crate::log;
-use crate::pipeline::{capture, token_estimate, CollapseBlank, Dedup, FilterNoise, Pipeline, StripAnsi, Truncate};
 use crate::pipeline::Ctx;
+use crate::pipeline::{
+    capture, token_estimate, CollapseBlank, Dedup, FilterNoise, Pipeline, StripAnsi, Truncate,
+};
 use anyhow::Result;
 
 // ---------------------------------------------------------------------------
@@ -29,7 +31,8 @@ const GIT_NOISE: &[&str] = &[
 
 pub fn run(args: &[String], ctx: &Ctx) -> Result<()> {
     // Strip leading "--" separator if present
-    let args: Vec<&str> = args.iter()
+    let args: Vec<&str> = args
+        .iter()
         .skip_while(|a| a.as_str() == "--")
         .map(String::as_str)
         .collect();
@@ -40,8 +43,8 @@ pub fn run(args: &[String], ctx: &Ctx) -> Result<()> {
 
     match args[0] {
         "status" => git_status(&args, ctx),
-        "diff"   => git_diff(&args, ctx),
-        "log"    => git_log(&args, ctx),
+        "diff" => git_diff(&args, ctx),
+        "log" => git_log(&args, ctx),
         "add" | "commit" | "push" | "pull" | "fetch" | "merge" | "rebase" | "stash" => {
             git_action(&args, ctx)
         }
@@ -58,7 +61,8 @@ fn git_status(args: &[&str], ctx: &Ctx) -> Result<()> {
 
     // Ultra: one-line summary
     if ctx.ultra {
-        let modified: Vec<&str> = raw.lines()
+        let modified: Vec<&str> = raw
+            .lines()
             .filter(|l| l.starts_with('\t') || l.starts_with("  "))
             .map(|l| l.trim())
             .collect();
@@ -73,7 +77,9 @@ fn git_status(args: &[&str], ctx: &Ctx) -> Result<()> {
 
     let pipeline = Pipeline::new()
         .push(StripAnsi)
-        .push(FilterNoise { patterns: GIT_NOISE.to_vec() })
+        .push(FilterNoise {
+            patterns: GIT_NOISE.to_vec(),
+        })
         .push(CollapseBlank)
         .push(Truncate { max: 80, tail: 10 });
 
@@ -89,7 +95,9 @@ fn git_diff(args: &[&str], ctx: &Ctx) -> Result<()> {
     // Keep: +/- diff lines, @@ hunks, file headers — drop most context lines
     let pipeline = Pipeline::new()
         .push(StripAnsi)
-        .push(FilterNoise { patterns: ["No newline at end of file"].to_vec() })
+        .push(FilterNoise {
+            patterns: ["No newline at end of file"].to_vec(),
+        })
         .push(Truncate { max: 300, tail: 20 });
 
     let (out, _, _) = pipeline.run(&raw);
@@ -100,10 +108,16 @@ fn git_diff(args: &[&str], ctx: &Ctx) -> Result<()> {
 fn git_log(args: &[&str], ctx: &Ctx) -> Result<()> {
     // Force --oneline if not already set
     let mut full_args: Vec<String> = build_cmd_str("git", args);
-    if !full_args.iter().any(|a| a == "--oneline" || a == "--format") {
+    if !full_args
+        .iter()
+        .any(|a| a == "--oneline" || a == "--format")
+    {
         full_args.push("--oneline".into());
     }
-    if !full_args.iter().any(|a| a.starts_with("-n") || a.starts_with("--max-count")) {
+    if !full_args
+        .iter()
+        .any(|a| a.starts_with("-n") || a.starts_with("--max-count"))
+    {
         full_args.push("-n".into());
         full_args.push("20".into());
     }
@@ -131,21 +145,33 @@ fn git_action(args: &[&str], ctx: &Ctx) -> Result<()> {
         }
         "commit" => {
             // "ok abc1234 message"
-            let hash = raw.lines()
+            let hash = raw
+                .lines()
                 .find_map(|l| {
                     // "[branch abc1234]" pattern
                     if l.contains('[') {
                         let mut parts = l.split_whitespace();
                         parts.next(); // skip branch
                         parts.next().map(|h| h.trim_end_matches(']').to_string())
-                    } else { None }
+                    } else {
+                        None
+                    }
                 })
                 .unwrap_or_default();
-            if hash.is_empty() { "ok".into() } else { format!("ok {hash}") }
+            if hash.is_empty() {
+                "ok".into()
+            } else {
+                format!("ok {hash}")
+            }
         }
         "add" => "ok".to_string(),
         _ => {
-            let pipeline = Pipeline::new().push(StripAnsi).push(FilterNoise { patterns: GIT_NOISE.to_vec() }).push(CollapseBlank);
+            let pipeline = Pipeline::new()
+                .push(StripAnsi)
+                .push(FilterNoise {
+                    patterns: GIT_NOISE.to_vec(),
+                })
+                .push(CollapseBlank);
             let (out, _, _) = pipeline.run(&raw);
             out
         }
@@ -160,13 +186,15 @@ fn git_action(args: &[&str], ctx: &Ctx) -> Result<()> {
 
 fn compact_push_pull(raw: &str, subcmd: &str) -> String {
     // Look for "branch -> branch" or "files changed" lines
-    let branch = raw.lines()
-        .find_map(|l| {
-            if l.contains("->") {
-                Some(l.trim().to_string())
-            } else { None }
-        });
-    let stats = raw.lines()
+    let branch = raw.lines().find_map(|l| {
+        if l.contains("->") {
+            Some(l.trim().to_string())
+        } else {
+            None
+        }
+    });
+    let stats = raw
+        .lines()
         .find(|l| l.contains("changed") || l.contains("up to date"));
 
     match (branch, stats) {
@@ -186,7 +214,9 @@ fn run_raw(args: &[&str], cmd_name: &str, ctx: &Ctx) -> Result<()> {
     let raw = capture(&str_args)?;
     let pipeline = Pipeline::new()
         .push(StripAnsi)
-        .push(FilterNoise { patterns: GIT_NOISE.to_vec() })
+        .push(FilterNoise {
+            patterns: GIT_NOISE.to_vec(),
+        })
         .push(Dedup)
         .push(CollapseBlank)
         .push(Truncate::default());
@@ -197,7 +227,9 @@ fn run_raw(args: &[&str], cmd_name: &str, ctx: &Ctx) -> Result<()> {
 
 fn emit(cmd: &str, raw: &str, filtered: &str, _ctx: &Ctx) {
     print!("{filtered}");
-    if !filtered.ends_with('\n') { println!(); }
+    if !filtered.ends_with('\n') {
+        println!();
+    }
     log::append(&log::Entry {
         cmd,
         raw_tokens: token_estimate(raw),

@@ -1,5 +1,7 @@
 use crate::log;
-use crate::pipeline::{capture, token_estimate, CollapseBlank, FilterNoise, Pipeline, StripAnsi, Truncate, Ctx};
+use crate::pipeline::{
+    capture, token_estimate, CollapseBlank, Ctx, FilterNoise, Pipeline, StripAnsi, Truncate,
+};
 use anyhow::Result;
 
 // ---------------------------------------------------------------------------
@@ -13,7 +15,9 @@ pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
     let raw = capture(&full)?;
 
     // Parse pytest summary line: "5 passed, 2 failed"
-    let summary = raw.lines().rev()
+    let summary = raw
+        .lines()
+        .rev()
         .find(|l| l.contains("passed") || l.contains("failed") || l.contains("error"))
         .map(|l| l.trim().to_string());
 
@@ -42,7 +46,9 @@ pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
     if out_lines.is_empty() {
         let pipeline = Pipeline::new()
             .push(StripAnsi)
-            .push(FilterNoise { patterns: vec!["platform ", "rootdir:", "plugins:", "collected "] })
+            .push(FilterNoise {
+                patterns: vec!["platform ", "rootdir:", "plugins:", "collected "],
+            })
             .push(CollapseBlank)
             .push(Truncate { max: 60, tail: 10 });
         let (o, _, _) = pipeline.run(&raw);

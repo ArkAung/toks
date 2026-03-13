@@ -1,10 +1,19 @@
 use crate::log;
-use crate::pipeline::{capture, token_estimate, CollapseBlank, Dedup, Pipeline, StripAnsi, Truncate, Ctx};
+use crate::pipeline::{
+    capture, token_estimate, CollapseBlank, Ctx, Dedup, Pipeline, StripAnsi, Truncate,
+};
 use anyhow::Result;
 
 pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
-    let args: Vec<&str> = args.iter().skip_while(|a| a.as_str() == "--").map(String::as_str).collect();
-    let full: Vec<String> = std::iter::once("docker").chain(args.iter().copied()).map(String::from).collect();
+    let args: Vec<&str> = args
+        .iter()
+        .skip_while(|a| a.as_str() == "--")
+        .map(String::as_str)
+        .collect();
+    let full: Vec<String> = std::iter::once("docker")
+        .chain(args.iter().copied())
+        .map(String::from)
+        .collect();
     let raw = capture(&full)?;
 
     let subcmd = args.first().copied().unwrap_or("");

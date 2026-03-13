@@ -4,7 +4,11 @@ use anyhow::Result;
 use std::collections::BTreeMap;
 
 pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
-    let args: Vec<&str> = args.iter().skip_while(|a| a.as_str() == "--").map(String::as_str).collect();
+    let args: Vec<&str> = args
+        .iter()
+        .skip_while(|a| a.as_str() == "--")
+        .map(String::as_str)
+        .collect();
     let full: Vec<String> = args.iter().map(|&s| s.to_string()).collect();
     let raw = capture(&full)?;
 
@@ -14,7 +18,9 @@ pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
 
     for line in raw.lines() {
         let t = line.trim();
-        if t.is_empty() { continue; }
+        if t.is_empty() {
+            continue;
+        }
         // eslint: "  path/file.ts:10:5  rule/name  message"
         // ruff:   "path/file.py:10:5: E501 message"
         // biome:  "path/file.ts:10:5 lint/rule ━━━"
@@ -45,7 +51,9 @@ pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
 pub fn tsc(args: &[String], _ctx: &Ctx) -> Result<()> {
     let mut full: Vec<String> = vec!["tsc".to_string()];
     full.extend(args.iter().skip_while(|a| a.as_str() == "--").cloned());
-    if !full.iter().any(|a| a == "--noEmit") { full.push("--noEmit".into()); }
+    if !full.iter().any(|a| a == "--noEmit") {
+        full.push("--noEmit".into());
+    }
 
     let raw = capture(&full)?;
 
@@ -56,7 +64,10 @@ pub fn tsc(args: &[String], _ctx: &Ctx) -> Result<()> {
         if let Some(paren) = line.find('(') {
             let file = &line[..paren];
             if file.ends_with(".ts") || file.ends_with(".tsx") {
-                by_file.entry(file.to_string()).or_default().push(line.to_string());
+                by_file
+                    .entry(file.to_string())
+                    .or_default()
+                    .push(line.to_string());
             }
         }
     }
@@ -69,7 +80,9 @@ pub fn tsc(args: &[String], _ctx: &Ctx) -> Result<()> {
             let msg = e.splitn(2, "error TS").nth(1).unwrap_or(e);
             out_lines.push(format!("  TS{}", &msg[..msg.len().min(80)]));
         }
-        if errors.len() > 3 { out_lines.push(format!("  … {} more", errors.len() - 3)); }
+        if errors.len() > 3 {
+            out_lines.push(format!("  … {} more", errors.len() - 3));
+        }
     }
     if out_lines.is_empty() {
         out_lines.push("ok (no type errors)".into());
@@ -86,8 +99,16 @@ fn extract_rule(line: &str) -> Option<String> {
     // eslint: rule name after two spaces at end
     let parts: Vec<&str> = line.split_whitespace().collect();
     for part in &parts {
-        if part.len() >= 4 && part.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false)
-            && part.chars().skip(1).all(|c| c.is_ascii_digit() || c.is_alphanumeric())
+        if part.len() >= 4
+            && part
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_uppercase())
+                .unwrap_or(false)
+            && part
+                .chars()
+                .skip(1)
+                .all(|c| c.is_ascii_digit() || c.is_alphanumeric())
         {
             return Some(part.to_string());
         }

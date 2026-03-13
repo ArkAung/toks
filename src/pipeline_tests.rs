@@ -1,4 +1,4 @@
-use crate::pipeline::{token_estimate, Pipeline, StripAnsi, CollapseBlank, Truncate};
+use crate::pipeline::{token_estimate, CollapseBlank, Pipeline, StripAnsi, Truncate};
 
 #[cfg(test)]
 mod tests {
@@ -89,7 +89,10 @@ mod tests {
     #[test]
     fn test_pipeline_empty() {
         let raw = "";
-        let p = Pipeline::new().push(StripAnsi).push(CollapseBlank).push(Truncate::default());
+        let p = Pipeline::new()
+            .push(StripAnsi)
+            .push(CollapseBlank)
+            .push(Truncate::default());
         let (out, _, _) = p.run(&raw);
         assert_eq!(out, "");
     }

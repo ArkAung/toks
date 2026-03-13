@@ -4,7 +4,6 @@
 /// Unlike rtk, we do NOT patch Claude Code's settings.json.
 /// We write to ~/.bashrc / ~/.zshrc / ~/.profile — works with any LLM agent
 /// (Claude Code, Cursor, Aider, Gemini CLI, Codex, Cline, etc.)
-
 use anyhow::Result;
 
 // ---------------------------------------------------------------------------
@@ -103,7 +102,10 @@ pub fn init(uninstall: bool, dry_run: bool) -> Result<()> {
     if target.exists() {
         let content = std::fs::read_to_string(target)?;
         if content.contains(HOOK_START) {
-            println!("Hook already installed in {}. Nothing to do.", target.display());
+            println!(
+                "Hook already installed in {}. Nothing to do.",
+                target.display()
+            );
             println!("Restart your shell or run:  source {}", target.display());
             return Ok(());
         }
@@ -130,17 +132,27 @@ pub fn init(uninstall: bool, dry_run: bool) -> Result<()> {
 }
 
 fn remove_hook(path: &std::path::Path) -> Result<()> {
-    if !path.exists() { return Ok(()); }
+    if !path.exists() {
+        return Ok(());
+    }
     let content = std::fs::read_to_string(path)?;
-    if !content.contains(HOOK_START) { return Ok(()); }
+    if !content.contains(HOOK_START) {
+        return Ok(());
+    }
 
     // Remove lines between HOOK_START and HOOK_END inclusive
     let mut out = Vec::new();
     let mut in_hook = false;
     for line in content.lines() {
-        if line.trim() == HOOK_START { in_hook = true; }
-        if !in_hook { out.push(line); }
-        if line.trim() == HOOK_END { in_hook = false; }
+        if line.trim() == HOOK_START {
+            in_hook = true;
+        }
+        if !in_hook {
+            out.push(line);
+        }
+        if line.trim() == HOOK_END {
+            in_hook = false;
+        }
     }
     std::fs::write(path, out.join("\n") + "\n")?;
     println!("Removed hook from {}", path.display());

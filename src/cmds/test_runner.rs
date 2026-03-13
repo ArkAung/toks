@@ -1,5 +1,8 @@
 use crate::log;
-use crate::pipeline::{capture, token_estimate, CollapseBlank, FilterNoise, KeepOnly, Pipeline, StripAnsi, Truncate, Dedup, Ctx};
+use crate::pipeline::{
+    capture, token_estimate, CollapseBlank, Ctx, Dedup, FilterNoise, KeepOnly, Pipeline, StripAnsi,
+    Truncate,
+};
 use anyhow::Result;
 
 // ---------------------------------------------------------------------------
@@ -7,13 +10,19 @@ use anyhow::Result;
 // ---------------------------------------------------------------------------
 
 pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
-    let args: Vec<&str> = args.iter().skip_while(|a| a.as_str() == "--").map(String::as_str).collect();
+    let args: Vec<&str> = args
+        .iter()
+        .skip_while(|a| a.as_str() == "--")
+        .map(String::as_str)
+        .collect();
     let full: Vec<String> = args.iter().map(|&s| s.to_string()).collect();
     let raw = capture(&full)?;
 
     let pipeline = Pipeline::new()
         .push(StripAnsi)
-        .push(KeepOnly { patterns: vec!["fail", "error", "panic", "assert", "FAIL", "ERROR"] })
+        .push(KeepOnly {
+            patterns: vec!["fail", "error", "panic", "assert", "FAIL", "ERROR"],
+        })
         .push(Dedup)
         .push(CollapseBlank)
         .push(Truncate { max: 80, tail: 15 });
@@ -32,8 +41,14 @@ pub fn run(args: &[String], _ctx: &Ctx) -> Result<()> {
 /// Show stderr/errors only from any command.
 pub fn err_only(args: &[String], _ctx: &Ctx) -> Result<()> {
     use std::process::Command;
-    let args: Vec<&str> = args.iter().skip_while(|a| a.as_str() == "--").map(String::as_str).collect();
-    if args.is_empty() { anyhow::bail!("no command given"); }
+    let args: Vec<&str> = args
+        .iter()
+        .skip_while(|a| a.as_str() == "--")
+        .map(String::as_str)
+        .collect();
+    if args.is_empty() {
+        anyhow::bail!("no command given");
+    }
 
     let output = Command::new(args[0]).args(&args[1..]).output()?;
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -41,14 +56,18 @@ pub fn err_only(args: &[String], _ctx: &Ctx) -> Result<()> {
 
     let pipeline = Pipeline::new()
         .push(StripAnsi)
-        .push(FilterNoise { patterns: vec!["npm warn", "yarn warn"] })
+        .push(FilterNoise {
+            patterns: vec!["npm warn", "yarn warn"],
+        })
         .push(Dedup)
         .push(CollapseBlank)
         .push(Truncate { max: 100, tail: 20 });
 
     let (out, _, _) = pipeline.run(&raw);
     emit("err", &raw, &out);
-    if !out.trim().is_empty() { println!("{out}"); }
+    if !out.trim().is_empty() {
+        println!("{out}");
+    }
     Ok(())
 }
 

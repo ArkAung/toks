@@ -33,7 +33,9 @@ fn collect_tree(
     max_depth: usize,
     out: &mut Vec<String>,
 ) -> Result<()> {
-    if depth >= max_depth { return Ok(()); }
+    if depth >= max_depth {
+        return Ok(());
+    }
 
     let mut entries: Vec<_> = fs::read_dir(dir)?
         .filter_map(|e| e.ok())
@@ -50,11 +52,21 @@ fn collect_tree(
 
     // If a directory has many files at leaf level, summarise
     if depth == max_depth - 1 {
-        let files: Vec<_> = entries.iter().filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false)).collect();
-        let dirs: Vec<_> = entries.iter().filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false)).collect();
+        let files: Vec<_> = entries
+            .iter()
+            .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+            .collect();
+        let dirs: Vec<_> = entries
+            .iter()
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .collect();
         if files.len() > 6 {
             for d in &dirs {
-                out.push(format!("{}├── {}/", prefix, d.file_name().to_string_lossy()));
+                out.push(format!(
+                    "{}├── {}/",
+                    prefix,
+                    d.file_name().to_string_lossy()
+                ));
             }
             out.push(format!("{}└── ({} files)", prefix, files.len()));
             return Ok(());
@@ -100,7 +112,9 @@ pub fn read(file: &str, level: ReadLevel, _ctx: &Ctx) -> Result<()> {
             let mut lines: Vec<&str> = Vec::new();
             for line in raw.lines() {
                 let blank = line.trim().is_empty();
-                if blank && prev_blank { continue; }
+                if blank && prev_blank {
+                    continue;
+                }
                 prev_blank = blank;
                 lines.push(line);
             }
@@ -124,9 +138,27 @@ pub fn read(file: &str, level: ReadLevel, _ctx: &Ctx) -> Result<()> {
 }
 
 fn is_signature_line(t: &str) -> bool {
-    let keywords = ["fn ", "pub fn", "async fn", "def ", "class ", "struct ", "impl ",
-                    "interface ", "type ", "enum ", "export function", "export class",
-                    "export const", "export default", "func ", "#[", "//", "/*", "\"\"\""];
+    let keywords = [
+        "fn ",
+        "pub fn",
+        "async fn",
+        "def ",
+        "class ",
+        "struct ",
+        "impl ",
+        "interface ",
+        "type ",
+        "enum ",
+        "export function",
+        "export class",
+        "export const",
+        "export default",
+        "func ",
+        "#[",
+        "//",
+        "/*",
+        "\"\"\"",
+    ];
     keywords.iter().any(|k| t.starts_with(k))
 }
 
@@ -142,7 +174,9 @@ pub fn grep(pattern: &str, path: &str, recursive: bool, _ctx: &Ctx) -> Result<()
         ("rg", vec!["--no-heading", "--line-number"])
     } else {
         let mut a = vec!["-n"];
-        if recursive { a.push("-r"); }
+        if recursive {
+            a.push("-r");
+        }
         ("grep", a)
     };
 
@@ -159,7 +193,10 @@ pub fn grep(pattern: &str, path: &str, recursive: bool, _ctx: &Ctx) -> Result<()
     let mut by_file: std::collections::BTreeMap<String, Vec<String>> = Default::default();
     for line in raw.lines() {
         if let Some((file, rest)) = line.split_once(':') {
-            by_file.entry(file.to_string()).or_default().push(rest.to_string());
+            by_file
+                .entry(file.to_string())
+                .or_default()
+                .push(rest.to_string());
         }
     }
 

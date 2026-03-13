@@ -137,9 +137,16 @@ fn main() -> Result<()> {
     match cli.command {
         Cmd::Ls { path } => cmds::files::ls(&path.unwrap_or_else(|| ".".into()), &ctx),
         Cmd::Read { file, level } => cmds::files::read(&file, level, &ctx),
-        Cmd::Grep { pattern, path, recursive } => {
-            cmds::files::grep(&pattern, &path.unwrap_or_else(|| ".".into()), recursive, &ctx)
-        }
+        Cmd::Grep {
+            pattern,
+            path,
+            recursive,
+        } => cmds::files::grep(
+            &pattern,
+            &path.unwrap_or_else(|| ".".into()),
+            recursive,
+            &ctx,
+        ),
 
         Cmd::Git { args } => cmds::git::run(&args, &ctx),
         Cmd::Cargo { args } => cmds::cargo::run(&args, &ctx),
