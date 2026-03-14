@@ -19,7 +19,8 @@ pub fn ls(path: &str, ctx: &Ctx) -> Result<()> {
     let root = p.display().to_string();
     lines.push(format!("{root}/"));
 
-    collect_tree(p, "", 0, ctx.ultra.then_some(1).unwrap_or(3), &mut lines)?;
+    let max_depth = if ctx.ultra { 1 } else { 3 };
+    collect_tree(p, "", 0, max_depth, &mut lines)?;
 
     let out = lines.join("\n");
     emit("ls", &out, &out); // already compact

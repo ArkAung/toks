@@ -77,7 +77,7 @@ pub fn tsc(args: &[String], _ctx: &Ctx) -> Result<()> {
         out_lines.push(format!("{file}: {} error(s)", errors.len()));
         for e in errors.iter().take(3) {
             // Just the message part
-            let msg = e.splitn(2, "error TS").nth(1).unwrap_or(e);
+            let msg = e.split_once("error TS").map(|x| x.1).unwrap_or(e);
             out_lines.push(format!("  TS{}", &msg[..msg.len().min(80)]));
         }
         if errors.len() > 3 {

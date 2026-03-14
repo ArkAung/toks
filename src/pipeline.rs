@@ -304,5 +304,5 @@ pub fn capture(args: &[String]) -> anyhow::Result<String> {
 
 /// Estimate token count: roughly 1 token per 4 chars (OpenAI heuristic).
 pub fn token_estimate(s: &str) -> usize {
-    (s.len() + 3) / 4
+    s.len().div_ceil(4)
 }

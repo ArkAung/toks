@@ -140,7 +140,10 @@ fn cargo_clippy(args: &[&str], _ctx: &Ctx) -> Result<()> {
     for line in raw.lines() {
         let t = line.trim();
         if t.starts_with("warning:") {
-            let rule = t.splitn(2, "warning: ").nth(1).unwrap_or("(unknown)");
+            let rule = t
+                .split_once("warning: ")
+                .map(|x| x.1)
+                .unwrap_or("(unknown)");
             *warnings.entry(rule.to_string()).or_default() += 1;
         } else if t.starts_with("error") {
             errors.push(t.to_string());

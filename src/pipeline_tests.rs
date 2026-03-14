@@ -11,14 +11,14 @@ mod tests {
         // ascii: length 5 => (5+3)/4 = 2
         assert_eq!(token_estimate("hello"), 2);
         // mixed ascii and space
-        assert_eq!(token_estimate("a b"), (("a b").len() + 3) / 4);
+        assert_eq!(token_estimate("a b"), ("a b").len().div_ceil(4));
     }
 
     #[test]
     fn test_pipeline_strip_ansi() {
         let raw = "\x1b[31mred\x1b[0m text\x1b[1m bold\x1b[0m";
         let p = Pipeline::new().push(StripAnsi);
-        let (out, _, _) = p.run(&raw);
+        let (out, _, _) = p.run(raw);
         assert_eq!(out, "red text bold");
     }
 
@@ -27,7 +27,7 @@ mod tests {
         // line1, blank, blank, line2, blank blank, line3, trailing newline
         let raw = "line1\n\n\nline2\n\n\nline3\n";
         let p = Pipeline::new().push(CollapseBlank);
-        let (out, _, _) = p.run(&raw);
+        let (out, _, _) = p.run(raw);
         // CollapseBlank reduces consecutive blank lines to a single blank line.
         // Trailing newline is dropped by lines().
         assert_eq!(out, "line1\n\nline2\n\nline3");
@@ -38,7 +38,7 @@ mod tests {
         // case where number of lines <= max
         let raw = "single line";
         let p = Pipeline::new().push(Truncate { max: 10, tail: 2 });
-        let (out, _, _) = p.run(&raw);
+        let (out, _, _) = p.run(raw);
         assert_eq!(out, "single line");
 
         // exact max lines
@@ -57,7 +57,7 @@ mod tests {
             .join("\n");
         let p = Pipeline::new().push(Truncate { max: 8, tail: 2 });
         let (out, _, _) = p.run(&raw);
-        let expected = vec![
+        let expected = [
             "line0",
             "line1",
             "line2",
@@ -79,7 +79,7 @@ mod tests {
             .push(StripAnsi)
             .push(CollapseBlank)
             .push(Truncate { max: 5, tail: 2 });
-        let (out, _, _) = p.run(&raw);
+        let (out, _, _) = p.run(raw);
         // StripAnsi -> "line1\n\n\nline2\n"
         // CollapseBlank -> "line1\n\nline2\n"
         // Now we have 3 lines (line1, blank, line2) which is <= max=5, so no truncation.
@@ -93,7 +93,7 @@ mod tests {
             .push(StripAnsi)
             .push(CollapseBlank)
             .push(Truncate::default());
-        let (out, _, _) = p.run(&raw);
+        let (out, _, _) = p.run(raw);
         assert_eq!(out, "");
     }
 }

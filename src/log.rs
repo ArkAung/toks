@@ -87,7 +87,7 @@ fn extract_u64(s: &str, key: &str) -> Option<u64> {
     s[start..end].parse().ok()
 }
 
-fn extract_str<'a>(s: &'a str, key: &str) -> Option<String> {
+fn extract_str(s: &str, key: &str) -> Option<String> {
     let start = s.find(key)? + key.len();
     let end = s[start..].find('"').map(|i| start + i)?;
     Some(s[start..end].to_string())
@@ -107,7 +107,7 @@ pub fn gain(history: bool, as_json: bool) -> Result<()> {
     let reader = std::io::BufReader::new(file);
     let mut records: Vec<Record> = reader
         .lines()
-        .filter_map(|l| l.ok())
+        .map_while(Result::ok)
         .filter_map(|l| parse_line(&l))
         .collect();
 
