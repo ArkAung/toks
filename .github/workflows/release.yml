@@ -7,97 +7,137 @@ on:
 
 permissions:
   contents: write   # needed to create releases and push back to the repo
-  packages: write   # not used here but kept for completeness
-  id-token: write   # needed for OIDC if you ever want to use it
 
 jobs:
-  build-release:
-    runs-on: macOS-latest   # we need macOS to build the macOS bottles
-    env:
-      # The version without the leading "v", e.g. 0.2.0
-      VERSION: ${{ github.ref_name }}
-      REPO: ${{ github.repository }}
-
+  # ── 1. Build macOS binaries (Intel + Apple Silicon) ───────────────────────
+  build-macos:
+    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
-        with:
-          # We need write access to push the updated formula back
-          persist-credentials: false   # we'll use the GITHUB_TOKEN explicitly
+      - uses: actions/checkout@v4
 
       - name: Set up Rust (stable)
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: |
-            x86_64-apple-darwin
-            aarch64-apple-darwin
-            x86_64-unknown-linux-gnu   # for Linux bottle (built via cross)
-          components: clippy, rustfmt
-
-      - name: Install cross‑compilation linker for Linux (musl)
-        # We'll build the Linux bottle using the `x86_64-unknown-linux-gnu` target
-        # which uses the standard GNU toolchain that ships with the runners.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
       - name: Cache Cargo registry & build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Build release binaries for all targets
+      - name: Build macOS binaries
         run: |
-          # macOS Intel
           cargo build --release --target x86_64-apple-darwin
-          # macOS Apple Silicon
           cargo build --release --target aarch64-apple-darwin
-          # Linux (using the cross target)
-          cargo build --release --target x86_64-unknown-linux-gnu
+          mkdir -p staging
+          cp target/x86_64-apple-darwin/release/toks staging/toks-x86_64-apple-darwin
+          cp target/aarch64-apple-darwin/release/toks staging/toks-aarch64-apple-darwin
 
-      - name: Package bottles
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-binaries
+          path: staging/
+
+  # ── 2. Build Linux binary ─────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build Linux binary
         run: |
-          VERSION=${{ env.VERSION }}
+          cargo build --release --target x86_64-unknown-linux-gnu
+          mkdir -p staging
+          cp target/x86_64-unknown-linux-gnu/release/toks staging/toks-x86_64-unknown-linux-gnu
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: staging/
+
+  # ── 3. Package, release, and update formula ───────────────────────────────
+  release:
+    needs: [build-macos, build-linux]
+    runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.repository }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip version prefix (v0.1.0 → 0.1.0)
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Download macOS binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-binaries
+          path: artifacts/macos
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: artifacts/linux
+
+      - name: Package bottles and source tarball
+        run: |
           mkdir -p dist
 
           # macOS Intel
-          mkdir -p toks-${VERSION}/bin
-          cp target/x86_64-apple-darwin/release/toks toks-${VERSION}/bin/
-          tar czf dist/toks-${VERSION}.x86_64.tar.gz -C toks-${VERSION} .
+          mkdir -p pkg/bin
+          cp artifacts/macos/toks-x86_64-apple-darwin pkg/bin/toks
+          chmod +x pkg/bin/toks
+          tar czf dist/toks-${VERSION}.x86_64.tar.gz -C pkg .
+          rm -rf pkg
 
           # macOS ARM64
-          mkdir -p toks-${VERSION}/bin
-          cp target/aarch64-apple-darwin/release/toks toks-${VERSION}/bin/
-          tar czf dist/toks-${VERSION}.arm64.tar.gz -C toks-${VERSION} .
+          mkdir -p pkg/bin
+          cp artifacts/macos/toks-aarch64-apple-darwin pkg/bin/toks
+          chmod +x pkg/bin/toks
+          tar czf dist/toks-${VERSION}.arm64.tar.gz -C pkg .
+          rm -rf pkg
 
           # Linux x86_64
-          mkdir -p toks-${VERSION}/bin
-          cp target/x86_64-unknown-linux-gnu/release/toks toks-${VERSION}/bin/
-          tar czf dist/toks-${VERSION}.x86_64_linux.tar.gz -C toks-${VERSION} .
+          mkdir -p pkg/bin
+          cp artifacts/linux/toks-x86_64-unknown-linux-gnu pkg/bin/toks
+          chmod +x pkg/bin/toks
+          tar czf dist/toks-${VERSION}.x86_64_linux.tar.gz -C pkg .
+          rm -rf pkg
 
-          # Also create the source tarball (needed for the formula’s url/sha256)
-          git archive --format=tar.gz --prefix=toks-${VERSION}/ -o dist/toks-${VERSION}.tar.gz ${{ github.sha }}
+          # Source tarball (for formula url/sha256)
+          git archive --format=tar.gz --prefix=toks-${VERSION}/ \
+            -o dist/toks-${VERSION}.tar.gz ${{ github.sha }}
 
-      - name: Compute SHA256 of artifacts
+      - name: Compute SHA256 checksums
         id: checksums
         run: |
-          VERSION=${{ env.VERSION }}
-          SOURCE_SHA=$(shasum -a 256 dist/toks-${VERSION}.tar.gz | awk '{print $1}')
-          INTEL_SHA=$(shasum -a 256 dist/toks-${VERSION}.x86_64.tar.gz | awk '{print $1}')
-          ARM64_SHA=$(shasum -a 256 dist/toks-${VERSION}.arm64.tar.gz | awk '{print $1}')
-          LINUX_SHA=$(shasum -a 256 dist/toks-${VERSION}.x86_64_linux.tar.gz | awk '{print $1}')
-          echo "SOURCE_SHA=$SOURCE_SHA" >> $GITHUB_OUTPUT
-          echo "INTEL_SHA=$INTEL_SHA" >> $GITHUB_OUTPUT
-          echo "ARM64_SHA=$ARM64_SHA" >> $GITHUB_OUTPUT
-          echo "LINUX_SHA=$LINUX_SHA" >> $GITHUB_OUTPUT
+          echo "SOURCE_SHA=$(sha256sum dist/toks-${VERSION}.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "INTEL_SHA=$(sha256sum dist/toks-${VERSION}.x86_64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "ARM64_SHA=$(sha256sum dist/toks-${VERSION}.arm64.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
+          echo "LINUX_SHA=$(sha256sum dist/toks-${VERSION}.x86_64_linux.tar.gz | awk '{print $1}')" >> $GITHUB_OUTPUT
 
-      - name: Create (or update) GitHub Release
-        id: create_release
+      - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -105,13 +145,6 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload release assets (bottles + source tarball)
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
           files: |
             dist/toks-${{ env.VERSION }}.tar.gz
             dist/toks-${{ env.VERSION }}.x86_64.tar.gz
@@ -121,26 +154,38 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Formula/toks.rb
+        env:
+          SOURCE_SHA: ${{ steps.checksums.outputs.SOURCE_SHA }}
+          ARM64_SHA: ${{ steps.checksums.outputs.ARM64_SHA }}
+          INTEL_SHA: ${{ steps.checksums.outputs.INTEL_SHA }}
+          LINUX_SHA: ${{ steps.checksums.outputs.LINUX_SHA }}
         run: |
-          VERSION=${{ env.VERSION }}
-          # Make sure the helper script is executable
-          chmod +x .github/scripts/update-formula.sh
-          # Run it – it will replace the source URL/sha256 and the three bottle SHA256s
-          .github/scripts/update-formula.sh "${VERSION}"
+          # Update source URL and sha256
+          sed -i \
+            -e "s|url \".*archive/refs/tags/v[^\"]*\"|url \"https://github.com/${REPO}/archive/refs/tags/v${VERSION}.tar.gz\"|" \
+            -e "s|root_url \".*\"|root_url \"https://github.com/${REPO}/releases/download/v${VERSION}\"|" \
+            Formula/toks.rb
+
+          # Update source sha256 (2-space indent, no "cellar:" keyword)
+          sed -i "s|^  sha256 \"[^\"]*\"|  sha256 \"${SOURCE_SHA}\"|" Formula/toks.rb
+
+          # Update bottle sha256s
+          sed -i \
+            -e "s|sha256 cellar: :any_skip_relocation, arm64_ventura:.*|sha256 cellar: :any_skip_relocation, arm64_ventura:   \"${ARM64_SHA}\"|" \
+            -e "s|sha256 cellar: :any_skip_relocation, x86_64_ventura:.*|sha256 cellar: :any_skip_relocation, x86_64_ventura:   \"${INTEL_SHA}\"|" \
+            -e "s|sha256 cellar: :any_skip_relocation, x86_64_linux:.*|sha256 cellar: :any_skip_relocation, x86_64_linux:    \"${LINUX_SHA}\"|" \
+            Formula/toks.rb
 
       - name: Commit and push formula update
-        env:
-          GIT_AUTHOR_NAME: github-actions
-          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
-          git config user.name "$GIT_AUTHOR_NAME"
-          git config user.email "$GIT_AUTHOR_EMAIL"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Formula/toks.rb
-          # Only commit if there are changes
           if ! git diff --cached --quiet; then
             git commit -m "Update formula to v${VERSION} [skip ci]"
-            git push origin HEAD:${{ github.ref }}
+            git push origin HEAD:main
           else
             echo "No changes to formula – nothing to commit."
           fi
-        # Use the default GITHUB_TOKEN (already has write permission on the repo)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

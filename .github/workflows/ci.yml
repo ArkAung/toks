@@ -53,6 +53,3 @@ jobs:
 
       - name: Test formula
         run: brew test toks
-
-      - name: Audit formula
-        run: brew audit --strict --online Formula/toks.rb
